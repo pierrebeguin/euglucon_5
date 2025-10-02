@@ -1,0 +1,125 @@
+﻿### Approche transdisciplinaire code R
+
+
+## import data
+
+
+data <- read.csv(url("https://docs.google.com/spreadsheets/d/1dz_rBtlgb4ZUrfhlfVfMeEclJLZTyqXO/export?format=csv"))
+
+
+## library
+
+
+library('ggplot2')
+library('tidyverse')
+library('dplyr')
+library('RColorBrewer')
+
+
+## Graphique linéaire
+
+
+data <- subset(data, select = -entreprise)
+colnames(data) <- gsub("X", "", colnames(data))
+data[is.na(data)] <- 0
+data$medicament <- ifelse(data$medicament == 'euglucon 5', 'euglucon 5', 'autre')
+data <- rbind(data[data$medicament != 'autre', ], c('autre', colSums(data[data$medicament == 'autre', -1], na.rm = TRUE)))
+data[, 2:10] <- lapply(data[, 2:10], as.numeric)
+data <- rbind(data, c('total', colSums(data[,-1], na.rm = TRUE)))
+
+
+data_pivot <- data %>%
+  pivot_longer(cols = -medicament, names_to = "date", values_to = "donnée")
+
+
+data_pivot$donnée <- as.numeric(data_pivot$donnée)
+
+
+graph <- ggplot(data_pivot, aes(x=date, y=donnée, group=medicament, color=medicament))
+graph <- graph + geom_line()
+graph <- graph + theme_minimal()
+graph <- graph + ylab('quantité x1000')
+graph <- graph + ggtitle('Antidiabétique vendu entre 1966-1974')
+graph <- graph + xlab('')
+graph
+
+
+## Diagramme circulaire
+
+
+data <- subset(data, select = c(-entreprise))
+data[is.na(data)] <- 0
+
+
+data <- data %>% mutate(perc_1966 = round(X1966 / sum(X1966, na.rm = TRUE) * 100, 2),
+                        perc_1967 = round(X1967 / sum(X1967, na.rm = TRUE) * 100, 2),
+                        perc_1968 = round(X1968 / sum(X1968, na.rm = TRUE) * 100, 2),
+                        perc_1969 = round(X1969 / sum(X1969, na.rm = TRUE) * 100, 2),
+                        perc_1970 = round(X1970 / sum(X1970, na.rm = TRUE) * 100, 2),
+                        perc_1971 = round(X1971 / sum(X1971, na.rm = TRUE) * 100, 2),
+                        perc_1972 = round(X1972 / sum(X1972, na.rm = TRUE) * 100, 2),
+                        perc_1973 = round(X1973 / sum(X1973, na.rm = TRUE) * 100, 2),
+                        perc_1974 = round(X1974 / sum(X1974, na.rm = TRUE) * 100, 2))
+
+
+data$medicament <- ifelse(data$perc_1970 < 3, "autre", data$medicament)
+
+
+data <- data %>%
+  group_by(medicament) %>%
+  summarize(across(everything(), sum, na.rm = TRUE))
+
+
+data <- data %>%
+  mutate(label_1966 = paste(medicament, "(", perc_1966, "%)"),
+         label_1967 = paste(medicament, "(", perc_1967, "%)"),
+         label_1968 = paste(medicament, "(", perc_1968, "%)"),
+         label_1969 = paste(medicament, "(", perc_1969, "%)"),
+         label_1970 = paste(medicament, "(", perc_1970, "%)"),
+         label_1971 = paste(medicament, "(", perc_1971, "%)"),
+         label_1972 = paste(medicament, "(", perc_1972, "%)"),
+         label_1973 = paste(medicament, "(", perc_1973, "%)"),
+         label_1974 = paste(medicament, "(", perc_1974, "%)")
+  )
+
+
+palette <- brewer.pal(10, "Set3")
+data$palette <- palette[as.numeric(factor(data$medicament))]
+
+
+data_filtered <- data %>%
+  filter(perc_1972 >= 1)
+
+
+pie(x = data_filtered$perc_1972,
+    labels = data_filtered$label_1972,
+    col = data_filtered$palette,
+    main = '1972',
+    border = 'black',
+    radius = 1.5)
+
+
+## Histogramme groupé
+
+
+data <- subset(data, select = -entreprise)
+colnames(data) <- gsub("X", "", colnames(data))
+data$medicament <- ifelse(data$medicament == 'euglucon 5', 'euglucon 5', 'autre')
+data <- rbind(data[data$medicament != 'autre', ], c('autre', colSums(data[data$medicament == 'autre', -1], na.rm = TRUE)))
+
+
+data_pivot <- data %>%
+  pivot_longer(cols = -medicament, names_to = "date", values_to = "donnée")
+
+
+data_pivot$donnée <- as.numeric(data_pivot$donnée)
+
+
+graph <- ggplot(data_pivot, aes(fill=medicament, y=donnée, x=date))
+graph <- graph + geom_bar(position="dodge", stat="identity")
+graph <- graph + theme_minimal()
+graph <- graph + scale_fill_manual(values = c("euglucon 5" = "red", "autre" = "blue"))
+graph <- graph + ggtitle('Progression du euglucon 5 comparé à l\'ensemble des autres antidibétiques')
+graph <- graph + xlab('') + ylab('x1000')
+graph <- graph + geom_text(aes(label=donnée, y=donnée), position=position_dodge(width=0.9), vjust=-0.25, size=2.5)
+graph
